@@ -1,0 +1,4 @@
+# 내 맥의 Docker PostgreSQL 전용 값 (docker-compose.yml과 일치)
+DB_URL: jdbc:postgresql://localhost:5432/prismview?reWriteBatchedInserts=true
+DB_USERNAME: prismview
+DB_PASSWORD: pv0110248
