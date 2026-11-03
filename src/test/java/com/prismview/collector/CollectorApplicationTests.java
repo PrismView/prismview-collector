@@ -2,14 +2,13 @@ package com.prismview.collector;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.ActiveProfiles;
+import org.springframework.context.annotation.Import;
 
 @SpringBootTest
-@ActiveProfiles("local") // 이 테스트는 local 프로필로 진행
+@Import(TestcontainersConfiguration.class)
 class CollectorApplicationTests {
 
-	@Test
-	void contextLoads() {
-	}
-
+    @Test
+    void contextLoads() {
+    }
 }
