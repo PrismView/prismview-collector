@@ -5,3 +5,6 @@ spring:
     url: ${DB_URL}              # 어떤 DB에 붙을지 (값은 환경별 파일이나 환경변수에서)
     username: ${DB_USERNAME}
     password: ${DB_PASSWORD}
+
+okx:
+  base-url: https://www.okx.com
