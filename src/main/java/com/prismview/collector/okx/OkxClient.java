@@ -4,12 +4,12 @@ import com.prismview.collector.domain.Candle;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
-
+import com.prismview.collector.backfill.CandlePageSource; // 1. import 추가 (여기!)
 import java.util.List;
 import java.util.Optional;
 
 @Component
-public class OkxClient {
+public class OkxClient implements CandlePageSource { // 2. implements CandlePageSource 추가 (여기!)
 
     private static final String HISTORY_CANDLES_PATH = "/api/v5/market/history-candles";
     private static final String BAR = "1s";
@@ -24,8 +24,10 @@ public class OkxClient {
 
     /**
      * 1초봉 한 페이지(최대 100개, 최신순).
+     * 
      * @param after 이 ts(ms)보다 이전 봉을 요청. null이면 최신부터. (페이지네이션은 M3)
      */
+    @Override // 3. @Override 붙여주는 것을 권장합니다 (선택사항이지만 권장)
     public List<Candle> fetchOnePage(String instId, Long after) {
         OkxCandleResponse response = restClient.get()
                 .uri(uriBuilder -> uriBuilder
