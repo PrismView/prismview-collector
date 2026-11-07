@@ -1,23 +1,27 @@
 package com.prismview.collector.backfill;
 
 import com.prismview.collector.domain.Candle;
+import com.prismview.collector.ratelimit.MinIntervalRateLimiter; // 추가
 import com.prismview.collector.storage.Candle1sRepository;
 import java.util.List;
 import org.springframework.stereotype.Service;
 
 /**
- * 한 종목의 1초봉을 OKX 제공 범위 끝까지 과거 방향으로 받아 저장한다.
- * 중단 후 다시 실행하면 DB의 가장 오래된 ts부터 이어서 받는다.
+- 한 종목의 1초봉을 OKX 제공 범위 끝까지 과거 방향으로 받아 저장한다.
+- 중단 후 다시 실행하면 DB의 가장 오래된 ts부터 이어서 받는다.
  */
 @Service
 public class BackfillService {
 
     private final CandlePageSource source;
     private final Candle1sRepository repository;
+    private final MinIntervalRateLimiter rateLimiter; // 추가
 
-    public BackfillService(CandlePageSource source, Candle1sRepository repository) {
+    public BackfillService(CandlePageSource source, Candle1sRepository repository,
+                           MinIntervalRateLimiter rateLimiter) { // 매개변수 추가
         this.source = source;
         this.repository = repository;
+        this.rateLimiter = rateLimiter; // 추가
     }
 
     public Result backfill(String instId) {
@@ -27,6 +31,8 @@ public class BackfillService {
         long saved = 0;
 
         while (true) {
+            rateLimiter.acquire(); // API 요청 직전에 추가
+
             List<Candle> page = source.fetchOnePage(instId, cursor);
             if (page.isEmpty()) {
                 break; // OKX 제공 범위 끝
