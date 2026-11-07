@@ -10,3 +10,5 @@ okx:
   base-url: https://www.okx.com
   rate-limit:
     min-interval: 125ms    # history-candles 2초당 20회(IP 기준)의 80% = 초당 8회
+  backfill:
+    inst-ids: BTC-USDT-SWAP,ETH-USDT-SWAP
