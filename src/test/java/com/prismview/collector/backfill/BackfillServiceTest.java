@@ -5,8 +5,10 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.prismview.collector.TestcontainersConfiguration;
 import com.prismview.collector.domain.Candle;
+import com.prismview.collector.ratelimit.MinIntervalRateLimiter; // 추가
 import com.prismview.collector.storage.Candle1sRepository;
 import java.math.BigDecimal;
+import java.time.Duration; // 추가
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
@@ -25,6 +27,9 @@ class BackfillServiceTest {
     private static final String BTC = "BTC-USDT-SWAP";
     private static final long TS = 1793685281000L; // 2026-11-03, candle_1s_2026_11 파티션 범위
 
+    /** 서비스 테스트는 커서 흐름만 본다 → 속도 제한 없음 */
+    private static final MinIntervalRateLimiter NO_LIMIT = new MinIntervalRateLimiter(Duration.ZERO); // 추가
+
     @Autowired
     Candle1sRepository repository;
 
@@ -41,7 +46,7 @@ class BackfillServiceTest {
         FakeSource source = new FakeSource(
                 page(TS, 3),            // TS, TS-1s, TS-2s
                 page(TS - 3000, 3));    // TS-3s, TS-4s, TS-5s → 다음은 빈 응답
-        BackfillService service = new BackfillService(source, repository);
+        BackfillService service = new BackfillService(source, repository, NO_LIMIT); // 수정 1
 
         BackfillService.Result result = service.backfill(BTC);
 
@@ -59,7 +64,7 @@ class BackfillServiceTest {
                 candle(TS, false),          // 맨 앞 = 진행 중인 봉
                 candle(TS - 1000, true),
                 candle(TS - 2000, true)));
-        BackfillService service = new BackfillService(source, repository);
+        BackfillService service = new BackfillService(source, repository, NO_LIMIT); // 수정 2
 
         BackfillService.Result result = service.backfill(BTC);
 
@@ -73,7 +78,7 @@ class BackfillServiceTest {
         FakeSource source = new FakeSource(
                 page(TS, 3),
                 page(TS, 3));           // 같은 페이지를 또 줌 → 커서가 줄지 않음
-        BackfillService service = new BackfillService(source, repository);
+        BackfillService service = new BackfillService(source, repository, NO_LIMIT); // 수정 3
 
         assertThatThrownBy(() -> service.backfill(BTC))
                 .isInstanceOf(IllegalStateException.class);
@@ -84,7 +89,7 @@ class BackfillServiceTest {
     void DB에_데이터가_있으면_가장_오래된_ts부터_이어서_받는다() {
         repository.upsertAll(page(TS, 3)); // 이전 실행에서 TS ~ TS-2s까지 받아 둔 상태
         FakeSource source = new FakeSource();
-        BackfillService service = new BackfillService(source, repository);
+        BackfillService service = new BackfillService(source, repository, NO_LIMIT); // 수정 4
 
         BackfillService.Result result = service.backfill(BTC);
 
@@ -95,7 +100,7 @@ class BackfillServiceTest {
 
     @Test
     void 처음부터_빈_응답이면_아무것도_저장하지_않는다() {
-        BackfillService service = new BackfillService(new FakeSource(), repository);
+        BackfillService service = new BackfillService(new FakeSource(), repository, NO_LIMIT); // 수정 5
 
         BackfillService.Result result = service.backfill(BTC);
 
