@@ -1,9 +1,13 @@
 package com.prismview.collector.backfill;
 
 import com.prismview.collector.domain.Candle;
-import com.prismview.collector.ratelimit.MinIntervalRateLimiter; // 추가
+import com.prismview.collector.ratelimit.MinIntervalRateLimiter;
 import com.prismview.collector.storage.Candle1sRepository;
+import java.time.Duration; // 추가
+import java.time.Instant; // 추가
 import java.util.List;
+import org.slf4j.Logger; // 추가
+import org.slf4j.LoggerFactory; // 추가
 import org.springframework.stereotype.Service;
 
 /**
@@ -13,15 +17,18 @@ import org.springframework.stereotype.Service;
 @Service
 public class BackfillService {
 
+    private static final Logger log = LoggerFactory.getLogger(BackfillService.class); // 추가
+    private static final int LOG_EVERY_PAGES = 100; // 100페이지 = 1만 행 ≈ 12.5초마다 추가
+
     private final CandlePageSource source;
     private final Candle1sRepository repository;
-    private final MinIntervalRateLimiter rateLimiter; // 추가
+    private final MinIntervalRateLimiter rateLimiter;
 
     public BackfillService(CandlePageSource source, Candle1sRepository repository,
-                           MinIntervalRateLimiter rateLimiter) { // 매개변수 추가
+                           MinIntervalRateLimiter rateLimiter) {
         this.source = source;
         this.repository = repository;
-        this.rateLimiter = rateLimiter; // 추가
+        this.rateLimiter = rateLimiter;
     }
 
     public Result backfill(String instId) {
@@ -29,9 +36,12 @@ public class BackfillService {
         Long cursor = repository.findMinTs(instId).orElse(null);
         long pages = 0;
         long saved = 0;
+        long startNanos = System.nanoTime(); // 추가
+
+        log.info("[{}] 백필 시작, 시작 커서={}", instId, toUtc(cursor)); // 추가
 
         while (true) {
-            rateLimiter.acquire(); // API 요청 직전에 추가
+            rateLimiter.acquire();
 
             List<Candle> page = source.fetchOnePage(instId, cursor);
             if (page.isEmpty()) {
@@ -51,9 +61,23 @@ public class BackfillService {
             cursor = oldest;
             pages++;
             saved += confirmed.size();
-        }
+
+            if (pages % LOG_EVERY_PAGES == 0) { // 추가
+                log.info("[{}] 진행: 커서={}, 페이지={}, 저장={}, 경과={}",
+                        instId, toUtc(cursor), pages, saved,
+                        Duration.ofNanos(System.nanoTime() - startNanos).toSeconds() + "s");
+            }
+        } // while 루프 종료 (누락되었던 괄호 추가)
+
+        log.info("[{}] 백필 완료: 총 페이지={}, 저장={}, 최종 커서={}",
+                instId, pages, saved, toUtc(cursor));
 
         return new Result(instId, pages, saved, cursor);
+    }
+
+    /** 로그용: epoch ms → UTC 시각 (null이면 "없음(최신부터)") */
+    private static String toUtc(Long epochMs) { // 추가
+        return epochMs == null ? "없음(최신부터)" : Instant.ofEpochMilli(epochMs).toString();
     }
 
     /** 백필 결과: 받은 페이지 수, 저장한 봉 수, 마지막 커서(= 받은 범위의 가장 오래된 ts) */
