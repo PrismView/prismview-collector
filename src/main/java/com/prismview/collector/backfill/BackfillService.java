@@ -2,6 +2,7 @@ package com.prismview.collector.backfill;
 
 import com.prismview.collector.domain.Candle;
 import com.prismview.collector.ratelimit.MinIntervalRateLimiter;
+import com.prismview.collector.retry.Retrier;
 import com.prismview.collector.storage.Candle1sRepository;
 import java.time.Duration; // 추가
 import java.time.Instant; // 추가
@@ -23,12 +24,14 @@ public class BackfillService {
     private final CandlePageSource source;
     private final Candle1sRepository repository;
     private final MinIntervalRateLimiter rateLimiter;
+    private final Retrier retrier;
 
     public BackfillService(CandlePageSource source, Candle1sRepository repository,
-                           MinIntervalRateLimiter rateLimiter) {
+                           MinIntervalRateLimiter rateLimiter, Retrier retrier) {
         this.source = source;
         this.repository = repository;
         this.rateLimiter = rateLimiter;
+        this.retrier = retrier;
     }
 
     public Result backfill(String instId) {
@@ -41,9 +44,12 @@ public class BackfillService {
         log.info("[{}] 백필 시작, 시작 커서={}", instId, toUtc(cursor)); // 추가
 
         while (true) {
-            rateLimiter.acquire();
-
-            List<Candle> page = source.fetchOnePage(instId, cursor);
+            // 재시도 때마다 속도 제한을 다시 거쳐야 OKX 호출 제한을 넘지 않는다
+            final Long after = cursor;
+            List<Candle> page = retrier.call(instId, () -> {
+                rateLimiter.acquire();
+                return source.fetchOnePage(instId, after);
+            });
             if (page.isEmpty()) {
                 break; // OKX 제공 범위 끝
             }

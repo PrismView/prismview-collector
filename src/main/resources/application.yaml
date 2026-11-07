@@ -10,5 +10,8 @@ okx:
   base-url: https://www.okx.com
   rate-limit:
     min-interval: 125ms    # history-candles 2초당 20회(IP 기준)의 80% = 초당 8회
+  retry:
+    max-attempts: 5        # 일시 오류 시 최대 시도 횟수
+    initial-delay: 1s      # 첫 재시도 대기 (이후 2배씩, 최대 30초)
   backfill:
     inst-ids: BTC-USDT-SWAP,ETH-USDT-SWAP
